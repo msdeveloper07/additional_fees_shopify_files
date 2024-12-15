@@ -1,0 +1,204 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<style>
+div#loadingmessage {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: rgba(0,0,0,.63);
+	z-index: 99;
+	cursor: default;
+}
+div#loadingmessage i {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	top: 50%;
+	width: 30px;
+	height: 30px;
+	margin: 0 auto;
+	font-size: 30px;
+	color: #fff;
+	transform: translate(0,-50%);
+}
+</style>
+
+
+<div id="loadingmessage" style="display:none">
+   <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+</div>
+
+
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+<script>
+var baseUrl = "https://staging.myshoponapp.com/api/v1/handling-fees-add";
+var storeUrl = window.location.origin;
+$(window).on("load", function() {
+  	addFixProduct();
+  	getCart();
+  	
+});
+
+$(document).on("click","#plus__quantity, #minus__quantity, .icon-remove",function() {
+    $("#loadingmessage").show();
+  	localStorage.setItem('added_fee', "");
+    setTimeout(function () {
+      getCart();
+    }, 2000);
+});
+
+function getCart() {
+  	var total_sum = 0;
+    $.ajax({
+        type: 'GET',
+        url: '/cart.json',
+        dataType: 'json',
+        success: function(data) {
+          var dd = '';
+          $.each(data.items, function(index, obj) {
+            var handle = obj.handle;
+            if(obj.product_type == "Handling Fees" && obj.product_description == "Handling Fees!"){
+              var vid = obj.id;
+              dd+= "updates["+vid+"]=0";
+              if(index + 2  < data.items.length) {
+              	dd+= '&';
+              }
+            } 
+          });
+          dd += '';
+          setTimeout(function () {
+            jQuery.post(window.Shopify.routes.root + 'cart/update.js',
+                dd
+            );
+          }, 100);
+          $.each(data.items, function(index, obj) {
+            if(obj.product_type != "Handling Fees" && obj.product_type != "Additional Charge"){
+              total_sum += obj.price * obj.quantity;
+            }
+          });
+          //addProduct(total_sum);    
+        },
+        complete: function() {
+          addProduct(total_sum);
+        }  
+    });
+}
+
+function addProduct(total_sum) {
+    $("#loadingmessage").show();
+    if (total_sum > 0) {
+        $.ajax({
+            url: baseUrl,
+            type: "get", //send it through get method
+            data: {
+      			cart_total: total_sum, store_url: storeUrl
+            },
+            success: function(response) {
+                const obj = JSON.parse(response);
+      			const vid = response;
+                // set the item in localStorage
+                localStorage.setItem('variant_id', vid);
+                addHandlingFeesProduct();
+            },
+            error: function(xhr) {
+                console.log(xhr);
+            }
+        });
+  }else{
+    $.ajax({ 
+      type: "POST", 
+      url: '/cart/clear.js', 
+      success: function(){ 
+        $("#loadingmessage").hide();
+        window.location.href = "/collections/all";
+      }, 
+      dataType: 'json' 
+    });
+  }
+}
+
+
+  function addHandlingFeesProduct() {
+    var variant_id = localStorage.getItem('variant_id');
+    var added_fee = localStorage.getItem('added_fee');
+    var jj = JSON.stringify(variant_id);
+    let formData = variant_id;
+    fetch(window.Shopify.routes.root + 'cart/add.js', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: formData
+    })
+    .then(response => {
+      localStorage.setItem('added_fee', 1);
+      if ($(".addon_by").length > 0) {
+        $("#loadingmessage").hide();
+      } else {
+        setTimeout(function () {
+          location.reload(true);
+        }, 1500);
+
+      }
+      if(added_fee == ""){
+        setTimeout(function () {
+          location.reload(true);
+        }, 1500);
+      }
+      return response.json();
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+  }
+  
+  function addFixProduct(){
+    var get_pro_Url = "https://staging.myshoponapp.com/api/v1/get-fix-price-product";
+    $.ajax({
+      url: get_pro_Url,
+      type: "get", //send it through get method
+      data: {
+        store_url: storeUrl
+      },
+      success: function(response) {
+        var data = JSON.parse(response);
+        var variant = data.variants;
+        if(variant.length > 0){
+//           console.log(variant)
+//           $.each(variant, function(index, obj) {
+//             var variant_id = obj.variant_id;
+//             console.log(variant_id)
+//             jQuery.post(window.Shopify.routes.root + 'cart/update.js',
+//                         "updates["+variant_id+"]=1"
+//                        );
+//           });
+          
+          var additionalVar = '';
+          $.each(variant, function(index, obj) {
+            var variant_id = obj.variant_id;
+            additionalVar+= "updates["+variant_id+"]=1";
+            if(index + 1  < variant.length) {
+              additionalVar+= '&';
+            }
+          });
+          additionalVar += '';
+          setTimeout(function () {
+            jQuery.post(window.Shopify.routes.root + 'cart/update.js',
+                        additionalVar
+                       );
+          }, 100);
+          
+          
+        }
+      },
+      error: function(xhr) {
+        console.log(xhr);
+      }
+    });
+  }
+
+</script>
